@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>영어 단어장</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --card: #ffffff;
+      --primary: #4f6ef7;
+      --primary-dark: #3a56d4;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --done-bg: #f0fdf4;
+      --done-text: #16a34a;
+      --word-tag: #eff6ff;
+      --word-tag-text: #1d4ed8;
+      --sent-tag: #fdf4ff;
+      --sent-tag-text: #7e22ce;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    header {
+      background: var(--primary); color: #fff;
+      padding: 18px 24px; display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 2px 8px rgba(79,110,247,.3);
+    }
+    header h1 { font-size: 1.3rem; font-weight: 700; }
+
+    .container { max-width: 920px; margin: 0 auto; padding: 24px 16px; }
+
+    /* ── Import ── */
+    .import-card {
+      background: var(--card); border-radius: 14px; padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 24px;
+    }
+    .import-card h2 { font-size: .85rem; font-weight: 600; margin-bottom: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .tab-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab-btn {
+      padding: 7px 18px; border-radius: 8px; border: 1.5px solid var(--border);
+      background: #fff; cursor: pointer; font-size: .9rem; font-weight: 500; color: var(--muted); transition: all .15s;
+    }
+    .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    textarea {
+      width: 100%; height: 120px; padding: 12px; border: 1.5px solid var(--border);
+      border-radius: 10px; font-size: .95rem; resize: vertical; outline: none;
+      font-family: inherit; transition: border .15s;
+    }
+    textarea:focus { border-color: var(--primary); }
+    .file-drop {
+      border: 2px dashed var(--border); border-radius: 10px; padding: 32px 20px;
+      text-align: center; cursor: pointer; transition: border .15s, background .15s;
+    }
+    .file-drop:hover, .file-drop.drag { border-color: var(--primary); background: #eff4ff; }
+    .file-drop p { color: var(--muted); font-size: .95rem; }
+    .file-drop input { display: none; }
+    .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+    button.primary {
+      background: var(--primary); color: #fff; border: none;
+      padding: 10px 22px; border-radius: 9px; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .15s;
+    }
+    button.primary:hover { background: var(--primary-dark); }
+    button.secondary {
+      background: #fff; color: var(--muted); border: 1.5px solid var(--border);
+      padding: 10px 18px; border-radius: 9px; font-size: .95rem; cursor: pointer; transition: all .15s;
+    }
+    button.secondary:hover { border-color: var(--primary); color: var(--primary); }
+    .status-msg { font-size: .85rem; color: var(--success); margin-top: 8px; min-height: 18px; }
+
+    /* ── Toolbar ── */
+    .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 6px 16px; border-radius: 20px; border: 1.5px solid var(--border);
+      background: #fff; cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--muted); transition: all .15s;
+    }
+    .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .stats { margin-left: auto; font-size: .85rem; color: var(--muted); }
+    .stats b { color: var(--text); }
+
+    /* ── Progress ── */
+    .progress-wrap { margin-bottom: 18px; }
+    .progress-label { font-size: .82rem; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .progress-bar { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--success); border-radius: 99px; transition: width .4s; }
+
+    /* ── Section ── */
+    .section-title { font-size: 1rem; font-weight: 700; margin: 20px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .badge { font-size: .75rem; padding: 2px 9px; border-radius: 20px; font-weight: 600; }
+    .badge.word { background: var(--word-tag); color: var(--word-tag-text); }
+    .badge.sent { background: var(--sent-tag); color: var(--sent-tag-text); }
+
+    /* ── Item card ── */
+    .item-list { display: flex; flex-direction: column; gap: 10px; }
+    .item {
+      background: var(--card); border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07); border: 1.5px solid transparent;
+      transition: border .2s, background .2s, opacity .2s; overflow: hidden;
+    }
+    .item.done { background: var(--done-bg); border-color: #bbf7d0; opacity: .8; }
+
+    .item-header {
+      display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
+    }
+    .item input[type=checkbox] {
+      width: 19px; height: 19px; accent-color: var(--success);
+      flex-shrink: 0; margin-top: 3px; cursor: pointer;
+    }
+    .item-main { flex: 1; min-width: 0; }
+
+    /* top row: word + pos badge */
+    .item-en-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .item-en { font-size: 1.05rem; font-weight: 700; word-break: break-word; }
+    .item.done .item-en { text-decoration: line-through; color: var(--done-text); }
+    .pos-badge {
+      font-size: .7rem; font-weight: 600; padding: 1px 7px; border-radius: 4px;
+      background: #f1f5f9; color: var(--muted); flex-shrink: 0;
+    }
+
+    /* meta chips */
+    .item-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 5px; }
+    .meta-chip { display: flex; align-items: center; gap: 4px; font-size: .85rem; }
+    .meta-chip .label {
+      font-size: .72rem; font-weight: 600; color: #fff; padding: 1px 6px;
+      border-radius: 4px; flex-shrink: 0;
+    }
+    .label-pron  { background: #6366f1; }
+    .label-ko    { background: #f59e0b; }
+    .label-trans { background: #8b5cf6; }
+    .meta-chip .val { color: var(--text); }
+
+    /* definition */
+    .item-def {
+      margin-top: 5px; font-size: .88rem; color: var(--muted);
+    }
+
+    /* example */
+    .item-example {
+      margin-top: 6px; padding: 8px 10px; background: #f0fdf4;
+      border-left: 3px solid #10b981; border-radius: 0 6px 6px 0;
+      font-size: .85rem; color: #166534; font-style: italic;
+    }
+    .item-example .ex-label {
+      font-style: normal; font-weight: 700; font-size: .72rem;
+      color: #10b981; margin-right: 6px; text-transform: uppercase;
+    }
+    .item-trans {
+      margin-top: 6px; padding: 7px 10px; background: #faf5ff;
+      border-left: 3px solid #8b5cf6; border-radius: 0 6px 6px 0;
+      font-size: .9rem; color: #5b21b6;
+    }
+
+    /* fetching spinner */
+    .fetch-status {
+      margin-top: 5px; font-size: .8rem; color: var(--muted); display: flex; align-items: center; gap: 5px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 12px; height: 12px; border: 2px solid var(--border);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin .7s linear infinite; display: inline-block;
+    }
+
+    .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .icon-btn {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 1rem; padding: 5px; border-radius: 6px; transition: color .15s, background .15s;
+    }
+    .icon-btn:hover { background: #f1f5f9; color: var(--primary); }
+    .icon-btn.del:hover { color: var(--danger); background: #fff0f0; }
+
+    /* ── Edit panel ── */
+    .edit-panel {
+      border-top: 1.5px solid var(--border); padding: 14px 16px;
+      background: #f8fafc; display: none; flex-direction: column; gap: 10px;
+    }
+    .edit-panel.open { display: flex; }
+    .edit-row { display: flex; flex-direction: column; gap: 4px; }
+    .edit-row label { font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .edit-row input, .edit-row textarea {
+      width: 100%; padding: 8px 10px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: .9rem; font-family: inherit;
+      outline: none; resize: none; transition: border .15s;
+    }
+    .edit-row input:focus, .edit-row textarea:focus { border-color: var(--primary); }
+    .edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-save {
+      background: var(--primary); color: #fff; border: none;
+      padding: 7px 18px; border-radius: 8px; font-size: .9rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-cancel {
+      background: #fff; color: var(--muted); border: 1.5px solid var(--border);
+      padding: 7px 16px; border-radius: 8px; font-size: .9rem; cursor: pointer;
+    }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+    .empty .icon { font-size: 3rem; margin-bottom: 12px; }
+
+    /* ── Export ── */
+    .export-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+    @media (max-width: 600px) {
+      .stats { width: 100%; margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>📚</span>
+  <h1>영어 단어장</h1>
+  <span style="margin-left:auto;font-size:.78rem;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:20px;font-weight:600;letter-spacing:.03em;">
+    Merriam-Webster
+  </span>
+</header>
+
+<div class="container">
+
+  <!-- Import -->
+  <div class="import-card">
+    <h2>📥 내용 추가</h2>
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="switchTab('text')">텍스트 붙여넣기</button>
+      <button class="tab-btn" onclick="switchTab('file')">파일 업로드</button>
+    </div>
+    <div id="tab-text" class="tab-panel active">
+      <textarea id="inputText" placeholder="카카오톡에서 복사한 영어 문서를 붙여넣으세요...&#10;&#10;예시)&#10;serendipity&#10;apple - 사과&#10;The quick brown fox jumps over the lazy dog."></textarea>
+    </div>
+    <div id="tab-file" class="tab-panel">
+      <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+        <p>📂 클릭하거나 파일을 드래그하여 업로드<br><small style="color:#94a3b8">.txt 파일 지원</small></p>
+        <input type="file" id="fileInput" accept=".txt" onchange="handleFile(event)" />
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="primary" onclick="processInput()">✨ 자동 분류 & 추가</button>
+      <button class="secondary" onclick="clearInput()">지우기</button>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap" style="display:none">
+    <div class="progress-label"><span>전체 학습 진행률</span><span id="progressPct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button class="filter-btn active" onclick="setFilter('all',this)">전체</button>
+    <button class="filter-btn" onclick="setFilter('word',this)">단어</button>
+    <button class="filter-btn" onclick="setFilter('sentence',this)">문장</button>
+    <button class="filter-btn" onclick="setFilter('undone',this)">미완료</button>
+    <button class="filter-btn" onclick="setFilter('done',this)">완료</button>
+    <div class="stats" id="statsText"></div>
+  </div>
+
+  <!-- Word section -->
+  <div id="wordSection">
+    <div class="section-title">🔤 단어 <span class="badge word" id="wordCount">0</span></div>
+    <div class="item-list" id="wordList"></div>
+  </div>
+
+  <!-- Sentence section -->
+  <div id="sentSection" style="margin-top:20px">
+    <div class="section-title">💬 문장 <span class="badge sent" id="sentCount">0</span></div>
+    <div class="item-list" id="sentList"></div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty" id="emptyState">
+    <div class="icon">📖</div>
+    <p>아직 추가된 내용이 없습니다.<br>위에서 텍스트를 붙여넣거나 파일을 업로드하세요.</p>
+  </div>
+
+  <!-- Export -->
+  <div class="export-row" id="exportRow" style="display:none">
+    <button class="secondary" onclick="exportJSON()">💾 백업 (JSON)</button>
+    <button class="secondary" onclick="importJSON()">📂 복원 (JSON)</button>
+    <button class="secondary" onclick="clearAll()" style="margin-left:auto;color:var(--danger)">🗑 전체 삭제</button>
+  </div>
+  <input type="file" id="importInput" accept=".json" style="display:none" onchange="handleImport(event)" />
+
+</div>
+
+<script>
+// ── Data ──────────────────────────────────
+const STORE_KEY = 'eng_vocab_v4';
+// item fields: id, type, en, ko, pron, pos, definition, example, trans, done, dictFetched
+let items = [];
+let filter = 'all';
+let openEditId = null;
+
+function load() { try { items = JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { items = []; } }
+function save()  { localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
+load();
+
+// ── Tab ───────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', (i===0&&tab==='text')||(i===1&&tab==='file')));
+  document.getElementById('tab-text').classList.toggle('active', tab==='text');
+  document.getElementById('tab-file').classList.toggle('active', tab==='file');
+}
+
+// ── File ──────────────────────────────────
+function handleFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('inputText').value = ev.target.result;
+    switchTab('text');
+    setStatus(`📄 "${f.name}" 로드 완료`);
+  };
+  reader.readAsText(f, 'UTF-8');
+}
+const fileDrop = document.getElementById('fileDrop');
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('drag'); });
+fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('drag'));
+fileDrop.addEventListener('drop', e => {
+  e.preventDefault(); fileDrop.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile({ target: { files: [f] } });
+});
+
+// ── Classify ──────────────────────────────
+function classify(line) {
+  const t = line.trim().replace(/^[\-\*\•\d]+[\.\)]\s*/, '').trim();
+  if (!t) return null;
+  const words = t.split(/\s+/);
+  const hasSep = /[-–:]\s/.test(t);
+  const isShort = words.length <= 3;
+  let en = t, ko = '';
+  if (hasSep) {
+    const sep = t.match(/[-–:]\s/);
+    const idx = t.indexOf(sep[0]);
+    const left = t.slice(0, idx).trim(), right = t.slice(idx + sep[0].length).trim();
+    if (/[가-힣]/.test(right))     { en = left;  ko = right; }
+    else if (/[가-힣]/.test(left)) { en = right; ko = left;  }
+    else { en = t; }
+  }
+  return {
+    id: Date.now() + Math.random(),
+    type: (isShort || hasSep) ? 'word' : 'sentence',
+    en, ko, pron: '', pos: '', definition: '', example: '', trans: '',
+    done: false, dictFetched: false
+  };
+}
+
+async function processInput() {
+  const raw = document.getElementById('inputText').value.trim();
+  if (!raw) { setStatus('⚠️ 텍스트를 입력해주세요.', true); return; }
+  const lines = raw.split('\n');
+  const newWords = [], newSents = [];
+  for (const line of lines) {
+    const item = classify(line); if (!item) continue;
+    if (items.find(x => x.en.toLowerCase() === item.en.toLowerCase())) continue;
+    items.push(item);
+    if (item.type === 'word')     newWords.push(item);
+    else                          newSents.push(item);
+  }
+  const added = newWords.length + newSents.length;
+  if (!added) { setStatus('⚠️ 새 항목 없음 (중복 제외)'); return; }
+  save(); render();
+  document.getElementById('inputText').value = '';
+  setStatus(`✅ ${added}개 추가됨. 사전/번역 조회 중...`);
+  await Promise.all([
+    newWords.length ? fetchDictBatch(newWords)  : Promise.resolve(),
+    newSents.length ? fetchTransBatch(newSents) : Promise.resolve(),
+  ]);
+  setStatus(`✅ 조회 완료`);
+}
+
+function clearInput() {
+  document.getElementById('inputText').value = '';
+  document.getElementById('statusMsg').textContent = '';
+}
+
+// ── Merriam-Webster API ───────────────────
+const MW_API_KEY = '9e020a89-8c0a-4b7e-b743-4884c94e97e6';
+
+// M-W 마크업 제거: {bc}, {it}word{/it}, {wi}word{/wi}, {b}...{/b} 등
+function cleanMW(str = '') {
+  return str
+    .replace(/\{bc\}/g, ': ')
+    .replace(/\{it\}(.*?)\{\/it\}/g, '$1')
+    .replace(/\{b\}(.*?)\{\/b\}/g, '$1')
+    .replace(/\{wi\}(.*?)\{\/wi\}/g, '$1')
+    .replace(/\{inf\}(.*?)\{\/inf\}/g, '$1')
+    .replace(/\{sup\}(.*?)\{\/sup\}/g, '$1')
+    .replace(/\{[^{}]+\}/g, '')   // 나머지 태그 제거
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+async function fetchDict(item) {
+  const word = item.en.trim().split(/\s+/)[0];
+  try {
+    const res = await fetch(
+      `https://www.dictionaryapi.com/api/v3/references/collegiate/json/${encodeURIComponent(word)}?key=${MW_API_KEY}`
+    );
+    if (!res.ok) { item.dictFetched = true; return; }
+    const data = await res.json();
+
+    // 단어를 못 찾으면 string 배열(추천 단어) 반환
+    if (!data.length || typeof data[0] === 'string') {
+      item.dictFetched = true; return;
+    }
+
+    const entry = data[0];
+
+    // 발음: hwi.prs[0].mw (Merriam-Webster 표기)
+    const prs = entry?.hwi?.prs;
+    if (prs?.length) item.pron = '/' + prs[0].mw + '/';
+
+    // 품사
+    if (entry.fl) item.pos = entry.fl;
+
+    // 정의: shortdef 첫 번째
+    if (entry.shortdef?.length) item.definition = entry.shortdef[0];
+
+    // 예문: def → sseq → sense → dt → vis[0].t
+    let foundEx = '';
+    outer:
+    for (const defBlock of (entry.def || [])) {
+      for (const sseq of (defBlock.sseq || [])) {
+        for (const senseArr of sseq) {
+          const sense = senseArr[1];
+          if (!sense?.dt) continue;
+          for (const dtItem of sense.dt) {
+            if (dtItem[0] === 'vis' && dtItem[1]?.length) {
+              foundEx = cleanMW(dtItem[1][0].t || '');
+              if (foundEx) break outer;
+            }
+          }
+        }
+      }
+    }
+    if (foundEx) item.example = foundEx;
+    item.dictFetched = true;
+  } catch {
+    item.dictFetched = true;
+  }
+}
+
+async function fetchDictBatch(wordItems) {
+  // Render "fetching" state first
+  render();
+  // Fetch sequentially with small delay to avoid rate-limit
+  for (const item of wordItems) {
+    await fetchDict(item);
+    save();
+    renderItemInPlace(item); // patch only this card DOM
+  }
+}
+
+// Patch a single card in-place without full re-render
+function renderItemInPlace(item) {
+  const el = document.getElementById('item-' + item.id);
+  if (!el) return; // card not visible under current filter
+  const tmp = document.createElement('div');
+  tmp.innerHTML = buildCard(item);
+  el.replaceWith(tmp.firstElementChild);
+}
+
+async function refetchDict(id) {
+  const item = items.find(x => String(x.id) === String(id));
+  if (!item) return;
+  item.dictFetched = false;
+  item.pron = ''; item.definition = ''; item.example = ''; item.pos = '';
+  save(); renderItemInPlace(item);
+  await fetchDict(item);
+  save(); renderItemInPlace(item);
+}
+
+// ── MyMemory Translation API ──────────────
+async function fetchTrans(item) {
+  try {
+    const res = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.en)}&langpair=en|ko`
+    );
+    if (!res.ok) { item.transFetched = true; return; }
+    const data = await res.json();
+    const translated = data?.responseData?.translatedText || '';
+    // MyMemory가 번역 실패 시 원문 그대로 돌려보내는 경우 걸러냄
+    if (translated && translated.toLowerCase() !== item.en.toLowerCase()) {
+      item.trans = translated;
+    }
+    item.transFetched = true;
+  } catch {
+    item.transFetched = true;
+  }
+}
+
+async function fetchTransBatch(sentItems) {
+  render();
+  for (const item of sentItems) {
+    await fetchTrans(item);
+    save();
+    renderItemInPlace(item);
+  }
+}
+
+async function refetchTrans(id) {
+  const item = items.find(x => String(x.id) === String(id));
+  if (!item) return;
+  item.transFetched = false;
+  item.trans = '';
+  save(); renderItemInPlace(item);
+  await fetchTrans(item);
+  save(); renderItemInPlace(item);
+}
+
+// ── Filter / Render ───────────────────────
+function setFilter(f, btn) {
+  filter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function render() {
+  const words = items.filter(x => x.type === 'word');
+  const sents  = items.filter(x => x.type === 'sentence');
+  const done   = items.filter(x => x.done).length;
+  const total  = items.length;
+
+  document.getElementById('wordCount').textContent = words.length;
+  document.getElementById('sentCount').textContent = sents.length;
+  document.getElementById('statsText').innerHTML = `<b>${done}</b> / ${total} 완료`;
+
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressWrap').style.display = total ? '' : 'none';
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('exportRow').style.display = total ? '' : 'none';
+
+  renderList('wordList', words);
+  renderList('sentList', sents);
+
+  document.getElementById('emptyState').style.display = total === 0 ? '' : 'none';
+  document.getElementById('wordSection').style.display = filter === 'sentence' ? 'none' : '';
+  document.getElementById('sentSection').style.display = filter === 'word'     ? 'none' : '';
+}
+
+function renderList(elId, arr) {
+  const el = document.getElementById(elId);
+  let visible = arr;
+  if (filter === 'done')   visible = arr.filter(x => x.done);
+  if (filter === 'undone') visible = arr.filter(x => !x.done);
+  if (visible.length === 0) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:.9rem;padding:8px 4px">표시할 항목이 없습니다.</div>`;
+    return;
+  }
+  el.innerHTML = visible.map(item => buildCard(item)).join('');
+}
+
+// ── Build card HTML ───────────────────────
+function buildCard(item) {
+  const id = item.id;
+  const isOpen = openEditId === id;
+
+  if (item.type === 'word') return buildWordCard(item, isOpen);
+  return buildSentCard(item, isOpen);
+}
+
+function buildWordCard(item, isOpen) {
+  const id = item.id;
+
+  // Pronunciation chip
+  const pronHtml = item.pron
+    ? `<span class="meta-chip"><span class="label label-pron">발음</span><span class="val">${escHtml(item.pron)}</span></span>`
+    : '';
+
+  // Korean meaning chip
+  const koHtml = item.ko
+    ? `<span class="meta-chip"><span class="label label-ko">뜻</span><span class="val">${escHtml(item.ko)}</span></span>`
+    : '';
+
+  const metaHtml = (pronHtml || koHtml)
+    ? `<div class="item-meta">${pronHtml}${koHtml}</div>` : '';
+
+  // Definition (English)
+  const defHtml = item.definition
+    ? `<div class="item-def">${escHtml(item.definition)}</div>` : '';
+
+  // Example from dictionary
+  const exHtml = item.example
+    ? `<div class="item-example"><span class="ex-label">예문</span>${escHtml(item.example)}</div>` : '';
+
+  // Fetch status indicator
+  let fetchHtml = '';
+  if (!item.dictFetched) {
+    fetchHtml = `<div class="fetch-status"><span class="spinner"></span>사전 검색 중...</div>`;
+  } else if (!item.example && !item.definition) {
+    fetchHtml = `<div class="fetch-status" style="color:#f59e0b">⚠️ 사전에서 찾을 수 없음</div>`;
+  }
+
+  // Edit panel: only 발음 override + Korean meaning
+  const editPanel = `
+    <div class="edit-panel ${isOpen ? 'open' : ''}" id="edit-${id}">
+      <div class="edit-row"><label>발음 (직접 입력)</label>
+        <input type="text" id="ep-${id}" value="${escAttr(item.pron)}" placeholder="예: /sɛrənˈdɪpɪti/" /></div>
+      <div class="edit-row"><label>뜻 (한국어)</label>
+        <input type="text" id="ek-${id}" value="${escAttr(item.ko)}" placeholder="한국어 뜻" /></div>
+      <div class="edit-actions">
+        <button class="btn-cancel" onclick="cancelEdit('${id}')">취소</button>
+        <button class="btn-save"   onclick="saveEditWord('${id}')">저장</button>
+      </div>
+    </div>`;
+
+  return `
+<div class="item ${item.done ? 'done' : ''}" id="item-${id}">
+  <div class="item-header">
+    <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggle('${id}')" />
+    <div class="item-main">
+      <div class="item-en-row">
+        <span class="item-en">${escHtml(item.en)}</span>
+        ${item.pos ? `<span class="pos-badge">${escHtml(item.pos)}</span>` : ''}
+      </div>
+      ${metaHtml}
+      ${defHtml}
+      ${exHtml}
+      ${fetchHtml}
+    </div>
+    <div class="item-actions">
+      <button class="icon-btn" title="편집" onclick="toggleEdit('${id}')">✏️</button>
+      <button class="icon-btn" title="사전 재검색" onclick="refetchDict('${id}')">🔍</button>
+      <button class="icon-btn del" title="삭제" onclick="deleteItem('${id}')">🗑</button>
+    </div>
+  </div>
+  ${editPanel}
+</div>`;
+}
+
+function buildSentCard(item, isOpen) {
+  const id = item.id;
+
+  // 번역 표시
+  let transHtml = '';
+  if (item.trans) {
+    transHtml = `<div class="item-trans">${escHtml(item.trans)}</div>`;
+  } else if (!item.transFetched) {
+    transHtml = `<div class="fetch-status"><span class="spinner"></span>번역 중...</div>`;
+  } else {
+    transHtml = `<div class="fetch-status" style="color:#f59e0b">⚠️ 번역을 가져오지 못했습니다</div>`;
+  }
+
+  const editPanel = `
+    <div class="edit-panel ${isOpen ? 'open' : ''}" id="edit-${id}">
+      <div class="edit-row"><label>뜻 (직접 수정)</label>
+        <textarea id="et-${id}" rows="2" placeholder="번역을 직접 입력하세요">${escHtml(item.trans)}</textarea></div>
+      <div class="edit-actions">
+        <button class="btn-cancel" onclick="cancelEdit('${id}')">취소</button>
+        <button class="btn-save"   onclick="saveEditSent('${id}')">저장</button>
+      </div>
+    </div>`;
+
+  return `
+<div class="item ${item.done ? 'done' : ''}" id="item-${id}">
+  <div class="item-header">
+    <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggle('${id}')" />
+    <div class="item-main">
+      <div class="item-en">${escHtml(item.en)}</div>
+      ${transHtml}
+    </div>
+    <div class="item-actions">
+      <button class="icon-btn" title="번역 수정" onclick="toggleEdit('${id}')">✏️</button>
+      <button class="icon-btn" title="번역 재시도" onclick="refetchTrans('${id}')">🔄</button>
+      <button class="icon-btn del" title="삭제" onclick="deleteItem('${id}')">🗑</button>
+    </div>
+  </div>
+  ${editPanel}
+</div>`;
+}
+
+// ── Edit ──────────────────────────────────
+function toggleEdit(id) {
+  openEditId = openEditId === id ? null : id;
+  render();
+  if (openEditId) {
+    setTimeout(() => {
+      const p = document.getElementById('edit-' + id);
+      if (p) p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  }
+}
+function cancelEdit(id) { openEditId = null; render(); }
+
+function saveEditWord(id) {
+  const item = items.find(x => String(x.id) === String(id)); if (!item) return;
+  item.pron = document.getElementById('ep-' + id)?.value.trim() || item.pron;
+  item.ko   = document.getElementById('ek-' + id)?.value.trim() || '';
+  openEditId = null; save(); render();
+}
+function saveEditSent(id) {
+  const item = items.find(x => String(x.id) === String(id)); if (!item) return;
+  item.trans = document.getElementById('et-' + id)?.value.trim() || '';
+  openEditId = null; save(); render();
+}
+
+// ── Actions ───────────────────────────────
+function toggle(id) {
+  const item = items.find(x => String(x.id) === String(id)); if (!item) return;
+  item.done = !item.done; save(); render();
+}
+function deleteItem(id) {
+  items = items.filter(x => String(x.id) !== String(id)); save(); render();
+}
+function clearAll() {
+  if (!confirm('모든 항목을 삭제할까요?')) return;
+  items = []; save(); render();
+}
+
+// ── Export / Import ───────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vocab_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+}
+function importJSON() { document.getElementById('importInput').click(); }
+function handleImport(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) throw 0;
+      let added = 0;
+      const newWords = [];
+      for (const it of data) {
+        if (!items.find(x => String(x.id) === String(it.id))) {
+          items.push(it); added++;
+          if (it.type === 'word' && !it.dictFetched) newWords.push(it);
+        }
+      }
+      save(); render();
+      setStatus(`✅ ${added}개 항목 복원됨`);
+      if (newWords.length) await fetchDictBatch(newWords);
+    } catch { setStatus('⚠️ 파일 형식이 올바르지 않습니다.', true); }
+  };
+  reader.readAsText(f); e.target.value = '';
+}
+
+// ── Helpers ───────────────────────────────
+function escHtml(s = '') {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escAttr(s = '') {
+  return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function setStatus(msg, isErr) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.style.color = isErr ? 'var(--danger)' : 'var(--success)';
+  if (!isErr) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3500);
+}
+
+// ── Init ──────────────────────────────────
+(async () => {
+  render();
+  const pendingWords = items.filter(x => x.type === 'word'     && !x.dictFetched);
+  const pendingSents = items.filter(x => x.type === 'sentence' && !x.transFetched);
+  await Promise.all([
+    pendingWords.length ? fetchDictBatch(pendingWords)   : Promise.resolve(),
+    pendingSents.length ? fetchTransBatch(pendingSents)  : Promise.resolve(),
+  ]);
+})();
+</script>
+</body>
+</html>
