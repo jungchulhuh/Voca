@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- mammoth: docx 파싱 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <!-- pdf.js: PDF 파싱 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- SheetJS: xlsx/csv 파싱 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <title>영어 단어장</title>
   <style>
     :root {
@@ -61,6 +67,11 @@
     .file-drop:hover, .file-drop.drag { border-color: var(--primary); background: #eff4ff; }
     .file-drop p { color: var(--muted); font-size: .95rem; }
     .file-drop input { display: none; }
+    .fmt-badge {
+      display: inline-block; font-size: .72rem; font-weight: 600;
+      padding: 2px 7px; border-radius: 4px; margin: 2px 2px;
+      background: #e0e7ff; color: #3730a3;
+    }
     .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
     button.primary {
       background: var(--primary); color: #fff; border: none;
@@ -209,6 +220,77 @@
     @media (max-width: 600px) {
       .stats { width: 100%; margin-left: 0; }
     }
+
+    /* ── Stats Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 1000;
+      align-items: flex-start; justify-content: center;
+      padding: 24px 16px; overflow-y: auto;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--card); border-radius: 18px;
+      width: 100%; max-width: 640px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+      animation: slideDown .2s ease;
+    }
+    @keyframes slideDown { from { transform: translateY(-16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 24px 16px;
+      border-bottom: 1.5px solid var(--border);
+    }
+    .modal-header h2 { font-size: 1.1rem; font-weight: 700; }
+    .modal-close {
+      background: none; border: none; font-size: 1.3rem; cursor: pointer;
+      color: var(--muted); line-height: 1; padding: 4px 8px; border-radius: 6px;
+    }
+    .modal-close:hover { background: #f1f5f9; color: var(--text); }
+    .modal-body { padding: 20px 24px 24px; }
+
+    /* summary cards */
+    .stat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+    @media (max-width: 480px) { .stat-cards { grid-template-columns: 1fr 1fr; } }
+    .stat-card {
+      background: var(--bg); border-radius: 12px; padding: 14px 16px;
+      text-align: center;
+    }
+    .stat-card .sc-val { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+    .stat-card .sc-label { font-size: .75rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+    .stat-card.blue .sc-val  { color: var(--primary); }
+    .stat-card.purple .sc-val { color: #7e22ce; }
+    .stat-card.green .sc-val  { color: var(--success); }
+
+    /* weekly table */
+    .stat-section-title { font-size: .8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted); margin-bottom: 10px; }
+    .week-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .week-table th {
+      text-align: left; padding: 8px 10px; font-size: .78rem; font-weight: 600;
+      color: var(--muted); border-bottom: 1.5px solid var(--border);
+    }
+    .week-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+    .week-table tr:last-child td { border-bottom: none; }
+    .week-table tr:hover td { background: var(--bg); }
+    .week-label { font-weight: 600; font-size: .82rem; color: var(--text); }
+    .week-chip {
+      display: inline-block; min-width: 28px; text-align: center;
+      padding: 2px 8px; border-radius: 20px; font-size: .82rem; font-weight: 600;
+    }
+    .chip-word { background: var(--word-tag); color: var(--word-tag-text); }
+    .chip-sent { background: var(--sent-tag); color: var(--sent-tag-text); }
+    .chip-done { background: #dcfce7; color: #15803d; }
+    .chip-zero { color: var(--muted); }
+
+    /* header stats btn */
+    .header-stats-btn {
+      margin-left: auto; background: rgba(255,255,255,.2); border: none;
+      color: #fff; font-size: 1.2rem; width: 36px; height: 36px;
+      border-radius: 50%; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; transition: background .15s; flex-shrink: 0;
+    }
+    .header-stats-btn:hover { background: rgba(255,255,255,.35); }
   </style>
 </head>
 <body>
@@ -216,10 +298,22 @@
 <header>
   <span>📚</span>
   <h1>영어 단어장</h1>
-  <span style="margin-left:auto;font-size:.78rem;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:20px;font-weight:600;letter-spacing:.03em;">
+  <span style="font-size:.78rem;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:20px;font-weight:600;letter-spacing:.03em;margin-left:auto;">
     Merriam-Webster
   </span>
+  <button class="header-stats-btn" onclick="openStats()" title="학습 통계">📊</button>
 </header>
+
+<!-- Stats Modal -->
+<div class="modal-overlay" id="statsModal" onclick="if(event.target===this)closeStats()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>📊 학습 현황</h2>
+      <button class="modal-close" onclick="closeStats()">✕</button>
+    </div>
+    <div class="modal-body" id="statsBody"></div>
+  </div>
+</div>
 
 <div class="container">
 
@@ -235,9 +329,19 @@
     </div>
     <div id="tab-file" class="tab-panel">
       <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
-        <p>📂 클릭하거나 파일을 드래그하여 업로드<br><small style="color:#94a3b8">.txt 파일 지원</small></p>
-        <input type="file" id="fileInput" accept=".txt" onchange="handleFile(event)" />
+        <p>📂 클릭하거나 파일을 드래그하여 업로드</p>
+        <p style="margin-top:6px">
+          <span class="fmt-badge">.txt</span>
+          <span class="fmt-badge">.docx</span>
+          <span class="fmt-badge">.pdf</span>
+          <span class="fmt-badge">.xlsx</span>
+          <span class="fmt-badge">.csv</span>
+        </p>
+        <input type="file" id="fileInput"
+          accept=".txt,.docx,.pdf,.xlsx,.xls,.csv"
+          onchange="handleFile(event)" />
       </div>
+      <div id="fileParseMsg" style="font-size:.82rem;color:var(--muted);margin-top:8px;min-height:18px;"></div>
     </div>
     <div class="btn-row">
       <button class="primary" onclick="processInput()">✨ 자동 분류 & 추가</button>
@@ -311,16 +415,97 @@ function switchTab(tab) {
 }
 
 // ── File ──────────────────────────────────
-function handleFile(e) {
-  const f = e.target.files[0]; if (!f) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    document.getElementById('inputText').value = ev.target.result;
-    switchTab('text');
-    setStatus(`📄 "${f.name}" 로드 완료`);
-  };
-  reader.readAsText(f, 'UTF-8');
+function setParseMsg(msg, isErr) {
+  const el = document.getElementById('fileParseMsg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isErr ? 'var(--danger)' : 'var(--muted)';
 }
+
+async function handleFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const name = f.name.toLowerCase();
+  setParseMsg(`⏳ "${f.name}" 읽는 중...`);
+  try {
+    let text = '';
+    if (name.endsWith('.txt')) {
+      text = await readAsText(f);
+    } else if (name.endsWith('.docx')) {
+      text = await parseDocx(f);
+    } else if (name.endsWith('.pdf')) {
+      text = await parsePdf(f);
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      text = await parseXlsx(f);
+    } else if (name.endsWith('.csv')) {
+      text = await parseCsv(f);
+    } else {
+      setParseMsg('⚠️ 지원하지 않는 파일 형식입니다.', true); return;
+    }
+    document.getElementById('inputText').value = text.trim();
+    switchTab('text');
+    setParseMsg(`✅ "${f.name}" 로드 완료 — "자동 분류 & 추가" 버튼을 눌러주세요`);
+  } catch (err) {
+    setParseMsg(`⚠️ 파일 읽기 실패: ${err.message}`, true);
+  }
+}
+
+// txt
+function readAsText(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = () => rej(new Error('읽기 오류'));
+    r.readAsText(f, 'UTF-8');
+  });
+}
+
+// docx → mammoth
+async function parseDocx(f) {
+  const buf = await f.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: buf });
+  return result.value;
+}
+
+// pdf → pdf.js
+async function parsePdf(f) {
+  if (typeof pdfjsLib === 'undefined') throw new Error('PDF 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf = await f.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(it => it.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+// xlsx / xls → SheetJS
+async function parseXlsx(f) {
+  const buf = await f.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  let text = '';
+  wb.SheetNames.forEach(name => {
+    const ws = wb.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    rows.forEach(row => {
+      const line = row.filter(c => c !== null && c !== undefined && String(c).trim()).join(' - ');
+      if (line.trim()) text += line + '\n';
+    });
+  });
+  return text;
+}
+
+// csv
+async function parseCsv(f) {
+  const raw = await readAsText(f);
+  return raw.split('\n').map(line =>
+    line.split(',').map(c => c.replace(/^"|"$/g, '').trim()).filter(Boolean).join(' - ')
+  ).filter(Boolean).join('\n');
+}
+
 const fileDrop = document.getElementById('fileDrop');
 fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('drag'); });
 fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('drag'));
@@ -330,24 +515,86 @@ fileDrop.addEventListener('drop', e => {
   if (f) handleFile({ target: { files: [f] } });
 });
 
+// ── Sentence splitter ─────────────────────
+// . ? ! 기준으로만 끊기 — 줄바꿈은 무시하고 이어붙임
+function expandLines(text) {
+  const result = [];
+  let buf = '';   // 문장 조각을 모으는 버퍼
+
+  function flushBuf() {
+    if (!buf.trim()) return;
+    // 버퍼 안에서 . ? ! 로 분리
+    const parts = buf
+      .replace(/([.?!])\s*/g, '$1\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 1);
+    parts.forEach(p => result.push(p));
+    buf = '';
+  }
+
+  function isWordEntry(line) {
+    // 단어 항목: 3단어 이하 OR 한국어 포함
+    // 구분자(: -)는 4단어 이하일 때만 단어 항목으로 판단 (긴 문장 안 콜론 방지)
+    const wc = line.split(/\s+/).length;
+    return wc <= 3
+      || /[가-힣]/.test(line)
+      || (wc <= 4 && /[-–:]\s/.test(line));
+  }
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+
+    // 빈 줄 → 버퍼 비우기
+    if (!line) { flushBuf(); continue; }
+
+    // 단어 항목 → 버퍼 비우고 바로 등록
+    if (isWordEntry(line)) {
+      flushBuf();
+      result.push(line);
+      continue;
+    }
+
+    // 일반 텍스트 → 버퍼에 이어붙이기
+    buf = buf ? buf + ' ' + line : line;
+
+    // 버퍼가 문장 끝 부호로 끝나면 즉시 비우기
+    if (/[.?!]\s*$/.test(buf)) flushBuf();
+  }
+
+  // 남은 버퍼 처리
+  flushBuf();
+  return result;
+}
+
 // ── Classify ──────────────────────────────
 function classify(line) {
-  const t = line.trim().replace(/^[\-\*\•\d]+[\.\)]\s*/, '').trim();
+  // # 헤딩 제거, 불릿 제거
+  const t = line.trim()
+    .replace(/^#+\s*/, '')
+    .replace(/^[\-\*\•\d]+[\.\)]\s*/, '')
+    .trim();
   if (!t) return null;
+
   const words = t.split(/\s+/);
-  const hasSep = /[-–:]\s/.test(t);
   const isShort = words.length <= 3;
-  let en = t, ko = '';
-  if (hasSep) {
+
+  // 구분자(- – :)는 4단어 이하일 때만 단어 항목으로 판단
+  // 긴 문장 안의 "He said: ..." 같은 경우는 문장으로 처리
+  let hasSep = false, en = t, ko = '';
+  if (words.length <= 4 && /[-–:]\s/.test(t)) {
     const sep = t.match(/[-–:]\s/);
     const idx = t.indexOf(sep[0]);
-    const left = t.slice(0, idx).trim(), right = t.slice(idx + sep[0].length).trim();
-    if (/[가-힣]/.test(right))     { en = left;  ko = right; }
-    else if (/[가-힣]/.test(left)) { en = right; ko = left;  }
-    else { en = t; }
+    const left  = t.slice(0, idx).trim();
+    const right = t.slice(idx + sep[0].length).trim();
+    if (/[가-힣]/.test(right))     { en = left;  ko = right; hasSep = true; }
+    else if (/[가-힣]/.test(left)) { en = right; ko = left;  hasSep = true; }
+    else if (left && right)         { en = left;              hasSep = true; }
   }
+
   return {
     id: Date.now() + Math.random(),
+    createdAt: Date.now(),
     type: (isShort || hasSep) ? 'word' : 'sentence',
     en, ko, pron: '', pos: '', definition: '', example: '', trans: '',
     done: false, dictFetched: false
@@ -357,7 +604,7 @@ function classify(line) {
 async function processInput() {
   const raw = document.getElementById('inputText').value.trim();
   if (!raw) { setStatus('⚠️ 텍스트를 입력해주세요.', true); return; }
-  const lines = raw.split('\n');
+  const lines = expandLines(raw);
   const newWords = [], newSents = [];
   for (const line of lines) {
     const item = classify(line); if (!item) continue;
@@ -763,6 +1010,114 @@ function setStatus(msg, isErr) {
   el.textContent = msg;
   el.style.color = isErr ? 'var(--danger)' : 'var(--success)';
   if (!isErr) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3500);
+}
+
+// ── Stats Modal ───────────────────────────
+function getItemTimestamp(item) {
+  // createdAt 없는 구버전 항목은 id(Date.now()+random) 에서 추출
+  if (item.createdAt) return item.createdAt;
+  const ts = parseInt(item.id, 10);
+  return isNaN(ts) ? Date.now() : ts;
+}
+
+// ISO 8601 주차 시작 날짜(월요일) 반환 → 고유 key로 사용
+function getWeekKey(ts) {
+  const d = new Date(ts);
+  const day = d.getDay(); // 0=일
+  const diff = (day === 0 ? -6 : 1 - day); // 월요일로 이동
+  const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+  return mon.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function formatWeekLabel(isoKey) {
+  // "2025-W23 (6/2 ~ 6/8)" 형태
+  const mon = new Date(isoKey);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+  // ISO 주차 계산
+  const tmp = new Date(mon.getTime());
+  tmp.setHours(0,0,0,0);
+  tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay()+6)%7));
+  const w1 = new Date(tmp.getFullYear(), 0, 4);
+  const wn = 1 + Math.round(((tmp - w1) / 86400000 - 3 + ((w1.getDay()+6)%7)) / 7);
+  return `${mon.getFullYear()}-W${String(wn).padStart(2,'0')} <span style="color:var(--muted);font-weight:400">(${fmt(mon)} ~ ${fmt(sun)})</span>`;
+}
+
+function openStats() {
+  const modal = document.getElementById('statsModal');
+  const body  = document.getElementById('statsBody');
+
+  const words = items.filter(x => x.type === 'word');
+  const sents = items.filter(x => x.type === 'sentence');
+  const done  = items.filter(x => x.done);
+  const total = items.length;
+  const pct   = total ? Math.round(done.length / total * 100) : 0;
+
+  // ── 주차별 집계 ──
+  const weekMap = {}; // key → { wordAdd, sentAdd, done }
+  for (const item of items) {
+    const ts = getItemTimestamp(item);
+    const wk = getWeekKey(ts);
+    if (!weekMap[wk]) weekMap[wk] = { wordAdd: 0, sentAdd: 0, done: 0 };
+    if (item.type === 'word')     weekMap[wk].wordAdd++;
+    else                          weekMap[wk].sentAdd++;
+    if (item.done)                weekMap[wk].done++;
+  }
+  const weekKeys = Object.keys(weekMap).sort().reverse(); // 최신 주 먼저
+
+  // ── HTML 조립 ──
+  const summaryHtml = `
+    <div class="stat-cards">
+      <div class="stat-card blue">
+        <div class="sc-val">${words.length}</div>
+        <div class="sc-label">전체 단어</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="sc-val">${sents.length}</div>
+        <div class="sc-label">전체 문장</div>
+      </div>
+      <div class="stat-card green">
+        <div class="sc-val">${done.length}<span style="font-size:1rem;font-weight:600"> / ${total}</span></div>
+        <div class="sc-label">완료 (${pct}%)</div>
+      </div>
+    </div>`;
+
+  let tableHtml = '';
+  if (weekKeys.length === 0) {
+    tableHtml = `<p style="color:var(--muted);font-size:.9rem;text-align:center;padding:20px 0">아직 데이터가 없습니다.</p>`;
+  } else {
+    const rows = weekKeys.map(wk => {
+      const w = weekMap[wk];
+      const wa = w.wordAdd ? `<span class="week-chip chip-word">${w.wordAdd}</span>` : `<span class="chip-zero">—</span>`;
+      const sa = w.sentAdd ? `<span class="week-chip chip-sent">${w.sentAdd}</span>` : `<span class="chip-zero">—</span>`;
+      const da = w.done    ? `<span class="week-chip chip-done">${w.done}</span>`    : `<span class="chip-zero">—</span>`;
+      return `<tr>
+        <td class="week-label">${formatWeekLabel(wk)}</td>
+        <td>${wa}</td>
+        <td>${sa}</td>
+        <td>${da}</td>
+      </tr>`;
+    }).join('');
+    tableHtml = `
+      <div class="stat-section-title">주차별 현황</div>
+      <table class="week-table">
+        <thead><tr>
+          <th>주차</th>
+          <th>단어 추가</th>
+          <th>문장 추가</th>
+          <th>완료</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  body.innerHTML = summaryHtml + tableHtml;
+  modal.classList.add('open');
+}
+
+function closeStats() {
+  document.getElementById('statsModal').classList.remove('open');
 }
 
 // ── Init ──────────────────────────────────
