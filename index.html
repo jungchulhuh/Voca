@@ -210,6 +210,23 @@
       padding: 7px 16px; border-radius: 8px; font-size: .9rem; cursor: pointer;
     }
 
+    /* ── Pagination ── */
+    .pagination {
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; margin-top: 14px; flex-wrap: wrap;
+    }
+    .pg-btn {
+      min-width: 36px; height: 36px; padding: 0 10px;
+      border-radius: 8px; border: 1.5px solid var(--border);
+      background: #fff; cursor: pointer; font-size: .88rem; font-weight: 600;
+      color: var(--muted); transition: all .15s; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .pg-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+    .pg-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .pg-btn:disabled { opacity: .35; cursor: default; }
+    .pg-info { font-size: .82rem; color: var(--muted); padding: 0 4px; }
+
     /* ── Empty ── */
     .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
     .empty .icon { font-size: 3rem; margin-bottom: 12px; }
@@ -370,12 +387,14 @@
   <div id="wordSection">
     <div class="section-title">🔤 단어 <span class="badge word" id="wordCount">0</span></div>
     <div class="item-list" id="wordList"></div>
+    <div class="pagination" id="wordPager"></div>
   </div>
 
   <!-- Sentence section -->
   <div id="sentSection" style="margin-top:20px">
     <div class="section-title">💬 문장 <span class="badge sent" id="sentCount">0</span></div>
     <div class="item-list" id="sentList"></div>
+    <div class="pagination" id="sentPager"></div>
   </div>
 
   <!-- Empty state -->
@@ -397,10 +416,13 @@
 <script>
 // ── Data ──────────────────────────────────
 const STORE_KEY = 'eng_vocab_v4';
+const PAGE_SIZE = 10;
 // item fields: id, type, en, ko, pron, pos, definition, example, trans, done, dictFetched
 let items = [];
 let filter = 'all';
 let openEditId = null;
+let wordPage = 1;
+let sentPage = 1;
 
 function load() { try { items = JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { items = []; } }
 function save()  { localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
@@ -615,6 +637,7 @@ async function processInput() {
   }
   const added = newWords.length + newSents.length;
   if (!added) { setStatus('⚠️ 새 항목 없음 (중복 제외)'); return; }
+  wordPage = 1; sentPage = 1;
   save(); render();
   document.getElementById('inputText').value = '';
   setStatus(`✅ ${added}개 추가됨. 사전/번역 조회 중...`);
@@ -698,14 +721,13 @@ async function fetchDict(item) {
 }
 
 async function fetchDictBatch(wordItems) {
-  // Render "fetching" state first
-  render();
-  // Fetch sequentially with small delay to avoid rate-limit
+  render(); // 스피너 표시
   for (const item of wordItems) {
     await fetchDict(item);
     save();
-    renderItemInPlace(item); // patch only this card DOM
+    renderItemInPlace(item);
   }
+  render(); // 최종 상태(페이지 버튼 포함) 확정
 }
 
 // Patch a single card in-place without full re-render
@@ -747,12 +769,13 @@ async function fetchTrans(item) {
 }
 
 async function fetchTransBatch(sentItems) {
-  render();
+  render(); // 스피너 표시
   for (const item of sentItems) {
     await fetchTrans(item);
     save();
     renderItemInPlace(item);
   }
+  render(); // 최종 상태(페이지 버튼 포함) 확정
 }
 
 async function refetchTrans(id) {
@@ -768,6 +791,7 @@ async function refetchTrans(id) {
 // ── Filter / Render ───────────────────────
 function setFilter(f, btn) {
   filter = f;
+  wordPage = 1; sentPage = 1;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   render();
@@ -798,15 +822,83 @@ function render() {
 }
 
 function renderList(elId, arr) {
-  const el = document.getElementById(elId);
+  const el      = document.getElementById(elId);
+  const isWord  = elId === 'wordList';
+  const pagerEl = document.getElementById(isWord ? 'wordPager' : 'sentPager');
+  if (!el || !pagerEl) return; // 안전 가드
+
   let visible = arr;
   if (filter === 'done')   visible = arr.filter(x => x.done);
   if (filter === 'undone') visible = arr.filter(x => !x.done);
+
   if (visible.length === 0) {
     el.innerHTML = `<div style="color:var(--muted);font-size:.9rem;padding:8px 4px">표시할 항목이 없습니다.</div>`;
+    pagerEl.innerHTML = '';
     return;
   }
-  el.innerHTML = visible.map(item => buildCard(item)).join('');
+
+  const totalPages = Math.ceil(visible.length / PAGE_SIZE);
+  let   curPage    = isWord ? wordPage : sentPage;
+  if (curPage > totalPages) {
+    curPage = totalPages;
+    if (isWord) wordPage = curPage; else sentPage = curPage;
+  }
+
+  const start  = (curPage - 1) * PAGE_SIZE;
+  const paged  = visible.slice(start, start + PAGE_SIZE);
+  el.innerHTML = paged.map(item => buildCard(item)).join('');
+
+  // ── Pagination controls ──
+  if (totalPages <= 1) { pagerEl.innerHTML = ''; return; }
+
+  const type = isWord ? 'word' : 'sent';
+  let html = '';
+
+  // Prev
+  html += `<button class="pg-btn" ${curPage===1?'disabled':''} onclick="goPage('${type}',${curPage-1})">‹</button>`;
+
+  // Page numbers (show up to 5 around current)
+  const range = buildPageRange(curPage, totalPages);
+  for (const p of range) {
+    if (p === '…') {
+      html += `<span class="pg-info">…</span>`;
+    } else {
+      html += `<button class="pg-btn ${p===curPage?'active':''}" onclick="goPage('${type}',${p})">${p}</button>`;
+    }
+  }
+
+  // Next
+  html += `<button class="pg-btn" ${curPage===totalPages?'disabled':''} onclick="goPage('${type}',${curPage+1})">›</button>`;
+
+  // Info
+  html += `<span class="pg-info">${visible.length}개 중 ${start+1}–${Math.min(start+PAGE_SIZE,visible.length)}</span>`;
+
+  pagerEl.innerHTML = html;
+}
+
+function buildPageRange(cur, total) {
+  if (total <= 7) return Array.from({length: total}, (_, i) => i + 1);
+  const pages = new Set([1, total, cur]);
+  if (cur > 1) pages.add(cur - 1);
+  if (cur < total) pages.add(cur + 1);
+  const sorted = [...pages].sort((a,b) => a-b);
+  const result = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) result.push('…');
+    result.push(p);
+    prev = p;
+  }
+  return result;
+}
+
+function goPage(type, page) {
+  if (type === 'word') wordPage = page;
+  else                 sentPage = page;
+  render();
+  // 해당 섹션 상단으로 스크롤
+  const sec = document.getElementById(type === 'word' ? 'wordSection' : 'sentSection');
+  if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Build card HTML ───────────────────────
@@ -1129,6 +1221,7 @@ function closeStats() {
     pendingWords.length ? fetchDictBatch(pendingWords)   : Promise.resolve(),
     pendingSents.length ? fetchTransBatch(pendingSents)  : Promise.resolve(),
   ]);
+  render(); // 조회 완료 후 최종 렌더(페이지 버튼 보장)
 })();
 </script>
 </body>
