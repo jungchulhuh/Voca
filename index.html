@@ -300,14 +300,32 @@
     .chip-done { background: #dcfce7; color: #15803d; }
     .chip-zero { color: var(--muted); }
 
-    /* header stats btn */
+    /* header icon btns */
     .header-stats-btn {
-      margin-left: auto; background: rgba(255,255,255,.2); border: none;
+      background: rgba(255,255,255,.2); border: none;
       color: #fff; font-size: 1.2rem; width: 36px; height: 36px;
       border-radius: 50%; cursor: pointer; display: flex; align-items: center;
       justify-content: center; transition: background .15s; flex-shrink: 0;
     }
     .header-stats-btn:hover { background: rgba(255,255,255,.35); }
+
+    /* ── Sync Modal ── */
+    .sync-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .sync-field label { font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .sync-field input {
+      padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: .9rem; font-family: inherit; outline: none;
+    }
+    .sync-field input:focus { border-color: var(--primary); }
+    .sync-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .sync-status { min-height: 20px; font-size: .85rem; margin-top: 10px; }
+    .sync-guide {
+      background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 18px; font-size: .82rem; line-height: 1.6;
+      color: #92400e;
+    }
+    .sync-guide b { color: #78350f; }
+    .sync-guide a { color: var(--primary); }
   </style>
 </head>
 <body>
@@ -319,7 +337,40 @@
     Merriam-Webster
   </span>
   <button class="header-stats-btn" onclick="openStats()" title="학습 통계">📊</button>
+  <button class="header-stats-btn" onclick="openSync()" title="클라우드 동기화">☁️</button>
 </header>
+
+<!-- Sync Modal -->
+<div class="modal-overlay" id="syncModal" onclick="if(event.target===this)closeSync()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>☁️ 클라우드 동기화</h2>
+      <button class="modal-close" onclick="closeSync()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="sync-guide">
+        <b>설정 방법 (최초 1회)</b><br>
+        1. <a href="https://github.com/settings/tokens/new" target="_blank">github.com → Settings → Tokens (classic)</a> 접속<br>
+        2. Note: <b>단어장</b>, Expiration: <b>No expiration</b><br>
+        3. Scope: <b>gist</b> 체크 → <b>Generate token</b> 클릭<br>
+        4. 생성된 토큰을 아래에 붙여넣기
+      </div>
+      <div class="sync-field">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="syncToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+      </div>
+      <div class="sync-field">
+        <label>Gist ID <span style="font-weight:400;text-transform:none">(PC에서 처음 저장하면 자동 생성)</span></label>
+        <input type="text" id="syncGistId" placeholder="다른 기기에서 불러올 때 입력" autocomplete="off" />
+      </div>
+      <div class="sync-btns">
+        <button class="primary" onclick="saveToCloud()">⬆️ 클라우드에 저장</button>
+        <button class="secondary" onclick="loadFromCloud()">⬇️ 클라우드에서 불러오기</button>
+      </div>
+      <div class="sync-status" id="syncStatus"></div>
+    </div>
+  </div>
+</div>
 
 <!-- Stats Modal -->
 <div class="modal-overlay" id="statsModal" onclick="if(event.target===this)closeStats()">
@@ -1102,6 +1153,107 @@ function setStatus(msg, isErr) {
   el.textContent = msg;
   el.style.color = isErr ? 'var(--danger)' : 'var(--success)';
   if (!isErr) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3500);
+}
+
+// ── Cloud Sync (GitHub Gist) ──────────────
+const SYNC_KEY = 'vocab_sync_cfg';
+
+function loadSyncCfg() {
+  try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch { return {}; }
+}
+function saveSyncCfg(cfg) { localStorage.setItem(SYNC_KEY, JSON.stringify(cfg)); }
+
+function openSync() {
+  const cfg = loadSyncCfg();
+  document.getElementById('syncToken').value  = cfg.token  || '';
+  document.getElementById('syncGistId').value = cfg.gistId || '';
+  const msg = cfg.lastSync
+    ? `마지막 동기화: ${new Date(cfg.lastSync).toLocaleString('ko-KR')}`
+    : '';
+  setSyncStatus(msg);
+  document.getElementById('syncModal').classList.add('open');
+}
+function closeSync() { document.getElementById('syncModal').classList.remove('open'); }
+
+function setSyncStatus(msg, isErr) {
+  const el = document.getElementById('syncStatus');
+  el.textContent = msg;
+  el.style.color = isErr ? 'var(--danger)' : isErr === false ? 'var(--success)' : 'var(--muted)';
+}
+
+async function saveToCloud() {
+  const token  = document.getElementById('syncToken').value.trim();
+  const gistId = document.getElementById('syncGistId').value.trim();
+  if (!token) { setSyncStatus('⚠️ Personal Access Token을 입력해주세요.', true); return; }
+
+  setSyncStatus('⏳ 저장 중...');
+  const body = {
+    description: '영어 단어장 데이터 (eng_vocab_v4)',
+    public: false,
+    files: { 'eng_vocab.json': { content: JSON.stringify(items, null, 2) } }
+  };
+  try {
+    const res = await fetch(
+      gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists',
+      {
+        method: gistId ? 'PATCH' : 'POST',
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
+    if (!res.ok) { const e = await res.json(); setSyncStatus(`⚠️ ${e.message}`, true); return; }
+    const data = await res.json();
+    const cfg = loadSyncCfg();
+    cfg.token = token; cfg.gistId = data.id; cfg.lastSync = Date.now();
+    saveSyncCfg(cfg);
+    document.getElementById('syncGistId').value = data.id;
+    setSyncStatus(`✅ 저장 완료 (${items.length}개 항목) — Gist ID를 다른 기기에서 입력하세요`, false);
+  } catch (e) { setSyncStatus(`⚠️ 오류: ${e.message}`, true); }
+}
+
+async function loadFromCloud() {
+  const token  = document.getElementById('syncToken').value.trim();
+  const gistId = document.getElementById('syncGistId').value.trim();
+  if (!token)  { setSyncStatus('⚠️ Personal Access Token을 입력해주세요.', true); return; }
+  if (!gistId) { setSyncStatus('⚠️ Gist ID를 입력해주세요. (PC에서 먼저 저장하세요.)', true); return; }
+
+  setSyncStatus('⏳ 불러오는 중...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    if (!res.ok) { const e = await res.json(); setSyncStatus(`⚠️ ${e.message}`, true); return; }
+    const data = await res.json();
+    const content = data.files?.['eng_vocab.json']?.content;
+    if (!content) { setSyncStatus('⚠️ Gist에서 단어장 데이터를 찾을 수 없습니다.', true); return; }
+    const loaded = JSON.parse(content);
+    if (!Array.isArray(loaded)) throw new Error('잘못된 데이터 형식');
+
+    if (items.length > 0 &&
+        !confirm(`현재 기기의 데이터(${items.length}개)를 클라우드 데이터(${loaded.length}개)로 교체할까요?`)) return;
+
+    items = loaded;
+    wordPage = 1; sentPage = 1;
+    save(); render();
+
+    const cfg = loadSyncCfg();
+    cfg.token = token; cfg.gistId = gistId; cfg.lastSync = Date.now();
+    saveSyncCfg(cfg);
+
+    setSyncStatus(`✅ 불러오기 완료 (${items.length}개 항목)`, false);
+
+    // 미번역/미조회 항목 자동 처리
+    const pw = items.filter(x => x.type === 'word'     && !x.dictFetched);
+    const ps = items.filter(x => x.type === 'sentence' && !x.transFetched);
+    if (pw.length || ps.length) {
+      setSyncStatus(`✅ 불러오기 완료 — 사전/번역 조회 중...`, false);
+      await Promise.all([
+        pw.length ? fetchDictBatch(pw)  : Promise.resolve(),
+        ps.length ? fetchTransBatch(ps) : Promise.resolve(),
+      ]);
+      setSyncStatus(`✅ 모든 조회 완료 (${items.length}개 항목)`, false);
+    }
+  } catch (e) { setSyncStatus(`⚠️ 오류: ${e.message}`, true); }
 }
 
 // ── Stats Modal ───────────────────────────
